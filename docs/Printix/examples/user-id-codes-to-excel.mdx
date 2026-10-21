@@ -1,0 +1,171 @@
+---
+title: Generate user ID codes and export to Excel
+sidebar_position: 1
+---
+
+# Generate user ID codes and export to Excel
+
+List all tenant users, generate an ID code for each, and export the results with
+ImportExcel's `Export-Excel`. Microsoft Excel itself is not required.
+
+:::warning[This replaces existing codes]
+
+Every successful `New-PrintixUserIdCode` call replaces that user's existing code.
+This is not a read-only export and cannot assign a code of your choosing.
+Do not rerun the whole script after a partial failure: it would replace codes
+already generated. Review the saved rows and investigate the failed user first.
+
+:::
+
+## Prerequisites
+
+- Connect to the intended tenant with the **Card registration** application type
+  required by the API, not User manager. See the
+  [application permissions matrix](../api-coverage.mdx#application-permissions).
+- Tenant user listing requires Printix Premium.
+- `Export-Excel` from ImportExcel is already installed and available.
+- Choose an existing, access-controlled output folder and a **new** `.xlsx` path.
+  Keep the workbook closed while the script runs.
+
+The workbook contains **credentials and personal data**. Restrict folder/file
+access, use approved encryption at rest and secure delivery, and delete it according
+to your retention policy. This example does not password-encrypt the workbook.
+Do not commit, attach to tickets, or store it in an uncontrolled synced folder.
+
+## Preview the users
+
+`-All` follows every page and includes both `USER` and `GUEST_USER` by default.
+Add `-Role USER` to the user-list call below if guests should be excluded.
+
+```powershell
+$tenantId = 'your-tenant-id'
+$users = @(Get-PrintixUsers -TenantId $tenantId -All -ErrorAction Stop)
+$users | Select-Object id, fullName, email, role
+
+foreach ($user in $users) {
+    New-PrintixUserIdCode -TenantId $tenantId -UserId $user.id -WhatIf
+}
+```
+
+## Generate and export
+
+Run this after previewing, in the same connected session. Set `$tenantId` and the
+output path explicitly. The script retrieves the user list again before starting.
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$tenantId = 'your-tenant-id'
+$outputPath = Join-Path $HOME 'Printix-UserIdCodes.xlsx'
+
+$null = Get-Command Export-Excel -ErrorAction Stop
+$outputPath = [IO.Path]::GetFullPath($outputPath)
+if ([IO.Path]::GetExtension($outputPath) -ne '.xlsx') {
+    throw 'Choose an .xlsx output path.'
+}
+if (Test-Path -LiteralPath $outputPath) {
+    throw 'The output file already exists. Choose a new path; do not overwrite a previous run.'
+}
+if (-not (Test-Path -LiteralPath (Split-Path $outputPath -Parent) -PathType Container)) {
+    throw 'Create and secure the output folder before running this script.'
+}
+
+$users = @(Get-PrintixUsers -TenantId $tenantId -All -ErrorAction Stop)
+if ($users.Count -eq 0) {
+    throw 'No users returned; no codes were changed and no workbook was created.'
+}
+foreach ($user in $users) {
+    if ([string]::IsNullOrWhiteSpace([string]$user.id)) {
+        throw 'A user has no ID; no codes were changed.'
+    }
+}
+if (@($users.id | Select-Object -Unique).Count -ne $users.Count) {
+    throw 'Duplicate user IDs returned; no codes were changed.'
+}
+
+function ConvertTo-ExcelSafeText {
+    param([AllowNull()][object]$Value)
+    $text = [string]$Value
+    if ($text -match '^[\s]*[=+@-]') {
+        return "'" + $text
+    }
+    return $text
+}
+
+$exportParams = @{
+    Path = $outputPath
+    AutoSize = $true
+    FreezeTopRow = $true
+    BoldTopRow = $true
+    AutoFilter = $true
+    NoNumberConversion = '*'
+    NoHyperLinkConversion = '*'
+    ErrorAction = 'Stop'
+}
+
+# Verify workbook creation before changing any user's code.
+[pscustomobject]@{
+    TenantId = ConvertTo-ExcelSafeText $tenantId
+    StartedUtc = [DateTime]::UtcNow.ToString('o')
+} | Export-Excel @exportParams -WorksheetName 'Run'
+
+$completed = 0
+foreach ($user in $users) {
+    Write-Host "Generating ID code for user $($user.id)"
+    $result = New-PrintixUserIdCode -TenantId $tenantId -UserId $user.id -ErrorAction Stop
+    if ($result.success -ne $true -or [string]::IsNullOrWhiteSpace([string]$result.idCode)) {
+        throw "No confirmed ID code returned for user $($user.id). Stop and investigate; the server may already have changed their code."
+    }
+
+    $row = [pscustomobject]@{
+        UserId = ConvertTo-ExcelSafeText $user.id
+        FullName = ConvertTo-ExcelSafeText $user.fullName
+        Email = ConvertTo-ExcelSafeText $user.email
+        Role = ConvertTo-ExcelSafeText $user.role
+        IdCode = ConvertTo-ExcelSafeText $result.idCode
+        GeneratedUtc = [DateTime]::UtcNow.ToString('o')
+    }
+
+    try {
+        $row | Export-Excel @exportParams -WorksheetName 'UserIdCodes' -Append
+    } catch {
+        throw "Workbook save failed for user $($user.id) after their code changed. Stop here. The code remains in `$result.idCode and the row in `$row in this session; recover them securely before closing it. Do not regenerate codes to retry the export."
+    }
+    $completed++
+    Start-Sleep -Seconds 1
+}
+Write-Host "Saved $completed users to $outputPath"
+```
+
+## Workbook fields and behaviour
+
+- **UserId**, **FullName**, **Email** and **Role** use the documented user-list
+  fields `id`, `fullName`, `email` and `role`.
+- **Email is not a guaranteed UPN.** Printix does not document a separate UPN in
+  this response. If your identity provider's UPN differs, obtain and join that
+  mapping separately rather than relabelling email as UPN.
+- **IdCode** uses the generation response's `idCode`, kept as text so `001234`
+  stays `001234`. Numeric conversion and hyperlink conversion are disabled.
+- Potential formula-like text is prefixed with an apostrophe rather than executed
+  as a spreadsheet formula. That protective prefix may be visible in the workbook.
+- **GeneratedUtc** records when the result was received, not a server-issued
+  creation timestamp. **Run** records the tenant and start time.
+- Each successful result is saved before the next user is processed. This is
+  slower than a single bulk export but preserves earlier results on later errors.
+- The one-second delay reduces request pressure; the shared Printix rate limit
+  still applies and the module retries HTTP 429 responses.
+
+The API mutation and file save are **not transactional**. A crash, network timeout,
+or disk failure can occur after Printix changes a code but before it is saved.
+The workbook is a record of saved results, not proof that every unsaved user was
+untouched. On errors, stop and reconcile before resuming; there is no automatic
+resume or rollback in this example.
+
+For unattended scripts, add connection cleanup appropriate to your workflow.
+`Disconnect-Printix` clears the module connection but does not erase codes from
+the workbook or revoke them at Printix.
+
+## References
+
+- [Printix user listing](https://printix.github.io/#_list_users)
+- [Printix ID-code generation response](https://printix.github.io/#_generate_id_code_example)
+- [New-PrintixUserIdCode](../commandlets/New/New-PrintixUserIdCode.mdx)

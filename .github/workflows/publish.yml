@@ -16,7 +16,7 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Validate release version and source
@@ -30,12 +30,12 @@ jobs:
           .\DevOps\Quality\test.ps1
           .\DevOps\Build\build.ps1
           .\DevOps\Quality\test.ps1 -UseBuiltModule -SkipScriptAnalyzer
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: module-build
           path: Output/Printix/
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: module-docs
           path: docs/Printix/
@@ -46,8 +46,8 @@ jobs:
     runs-on: windows-latest
     environment: PSGallery
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: module-build
           path: Output/Printix/
@@ -64,8 +64,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: module-build
           path: Output/Printix/

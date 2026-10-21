@@ -13,7 +13,7 @@ jobs:
   validate:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Bootstrap development tools
         shell: pwsh
         run: .\DevOps\Build\bootstrap.ps1
@@ -30,12 +30,12 @@ jobs:
         shell: pwsh
         run: .\DevOps\Quality\test.ps1 -UseBuiltModule -SkipScriptAnalyzer
       - name: Upload module
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Printix
           path: Output/Printix/
       - name: Upload documentation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: module-docs
           path: docs/Printix/
