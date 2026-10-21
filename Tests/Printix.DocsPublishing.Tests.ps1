@@ -54,8 +54,13 @@ Describe 'Scoped documentation synchronization' {
 		Get-Content -LiteralPath "$destination\docs\ninjaone\index.mdx" | Should -Be '# Other module'
 	}
 
-	It 'syncs the development guide and overview without changing released command help' {
+	It 'syncs development guides, examples and overview without changing released command help' {
 		$null = New-Item -Path "$source\development", "$destination\docs\printix\development", "$destination\docs\printix\commandlets" -ItemType Directory -Force
+		$null = New-Item -Path "$source\examples\nested", "$destination\docs\printix\examples" -ItemType Directory -Force
+		Set-Content -LiteralPath "$source\examples\index.mdx" -Value '# Examples'
+		Set-Content -LiteralPath "$source\examples\nested\export.mdx" -Value '# Export'
+		Set-Content -LiteralPath "$destination\docs\printix\examples\stale.mdx" -Value '# Stale example'
+		Set-Content -LiteralPath "$destination\docs\printix\examples\image.png" -Value 'preserved asset'
 		Set-Content -LiteralPath "$source\index.mdx" -Value '# Updated overview'
 		Set-Content -LiteralPath "$source\development\index.mdx" -Value '# Development'
 		Set-Content -LiteralPath "$destination\docs\printix\index.mdx" -Value '# Released overview'
@@ -66,8 +71,21 @@ Describe 'Scoped documentation synchronization' {
 		Get-Content -LiteralPath "$destination\docs\printix\development\index.mdx" | Should -Be '# Development'
 		Get-Content -LiteralPath "$destination\docs\printix\index.mdx" | Should -Be '# Updated overview'
 		Get-Content -LiteralPath "$destination\docs\printix\commandlets\Get-PrintixUsers.mdx" | Should -Be '# Released command'
+		Get-Content -LiteralPath "$destination\docs\printix\examples\nested\export.mdx" | Should -Be '# Export'
+		Get-Content -LiteralPath "$destination\docs\printix\examples\image.png" | Should -Be 'preserved asset'
+		Test-Path -LiteralPath "$destination\docs\printix\examples\stale.mdx" | Should -BeFalse
 		Test-Path -LiteralPath "$destination\docs\printix\index.md" | Should -BeFalse
 		Test-Path -LiteralPath "$destination\docs\printix\development\stale.mdx" | Should -BeFalse
+	}
+
+	It 'validates examples before modifying any destination docs' {
+		$null = New-Item -Path "$source\development", "$source\examples" -ItemType Directory -Force
+		Set-Content -LiteralPath "$source\index.mdx" -Value '# Overview'
+		Set-Content -LiteralPath "$source\development\index.mdx" -Value '# Development'
+		Set-Content -LiteralPath "$source\examples\index.mdx" -Value '# Examples'
+		Set-Content -LiteralPath "$source\examples\legacy.md" -Value '# Invalid'
+		{ & $syncScript -SourcePath $source -DocsRepositoryPath $destination -DevelopmentOnly } | Should -Throw '*MDX documents only*'
+		Test-Path -LiteralPath "$destination\docs\printix" | Should -BeFalse
 	}
 
 	It 'rejects incomplete artifacts and legacy Markdown before modifying the destination' {

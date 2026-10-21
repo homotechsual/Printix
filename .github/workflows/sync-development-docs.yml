@@ -77,7 +77,7 @@ jobs:
           try {
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add -- docs/printix/development docs/printix/index.mdx
+            git add -- docs/printix
             git add -u -- docs/printix
             $changes = git diff --cached --name-only
             if (-not $changes) {
