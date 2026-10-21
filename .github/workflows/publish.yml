@@ -1,0 +1,26 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    environment: PSGallery
+    steps:
+      - uses: actions/checkout@v6
+      - name: Bootstrap, build and verify
+        shell: pwsh
+        run: |
+          .\DevOps\Build\bootstrap.ps1
+          .\DevOps\Quality\test.ps1
+          .\DevOps\Build\build.ps1
+          .\DevOps\Quality\test.ps1 -UseBuiltModule -SkipScriptAnalyzer
+      - name: Publish to PowerShell Gallery
+        shell: pwsh
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: .\DevOps\Build\build.ps1 -TaskNames publish -NuGetApiKey $env:PSGALLERY_API_KEY
