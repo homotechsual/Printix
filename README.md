@@ -18,7 +18,7 @@ This is an independent MIT-licensed module, not an official Printix or Tungsten 
 
 Use the [docs website](https://docs.homotechsual.dev/modules/printix) for getting
 started, application permissions, Partner API guidance and a full automatically
-generated commandlet reference.
+generated cmdlet reference.
 
 Printix application types are **mutually exclusive, not combinable OAuth scopes**.
 See the [application permissions matrix](https://docs.homotechsual.dev/modules/printix/api-coverage#application-permissions)
