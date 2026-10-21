@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Document PowerShell Gallery installation and updates as the primary getting-started path.
+- Add a separate development documentation sync workflow, including the module overview while preserving released command help.
 - Complete CI/CD scaffolding with verified MDX artifacts, cross-repository docs sync, stable tag validation and GitHub release archives.
 - Document Gallery first publication, required secrets and environments.
 

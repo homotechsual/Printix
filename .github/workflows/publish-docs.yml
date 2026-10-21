@@ -2,14 +2,10 @@ name: Publish Documentation
 
 on:
   workflow_run:
-    workflows: [CI, Publish]
+    workflows: [Publish]
     types: [completed]
   workflow_dispatch:
     inputs:
-      development_only:
-        description: Sync only the development guide
-        type: boolean
-        default: false
       dry_run:
         description: Prepare documentation without pushing
         type: boolean
@@ -31,10 +27,8 @@ jobs:
         github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.head_repository.full_name == github.repository &&
         (
-          (github.event.workflow_run.name == 'Publish' &&
-            (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')) ||
-          (github.event.workflow_run.name == 'CI' && github.event.workflow_run.event == 'push' &&
-            github.event.workflow_run.head_branch == 'develop')
+          github.event.workflow_run.name == 'Publish' &&
+          (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
         )
       )
     runs-on: windows-latest
@@ -71,12 +65,11 @@ jobs:
       - name: Sync Printix documentation
         shell: pwsh
         env:
-          DEVELOPMENT_ONLY: ${{ inputs.development_only || github.event.workflow_run.name == 'CI' }}
           DRY_RUN: ${{ inputs.dry_run || false }}
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          .\DevOps\Help\Sync-Docs.ps1 -SourcePath '.\docs-artifact' -DocsRepositoryPath '.\docs-repo' -DevelopmentOnly:($env:DEVELOPMENT_ONLY -eq 'true')
+          .\DevOps\Help\Sync-Docs.ps1 -SourcePath '.\docs-artifact' -DocsRepositoryPath '.\docs-repo'
           Push-Location '.\docs-repo'
           try {
             git config user.name 'github-actions[bot]'

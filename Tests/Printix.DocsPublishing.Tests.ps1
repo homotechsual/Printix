@@ -54,14 +54,19 @@ Describe 'Scoped documentation synchronization' {
 		Get-Content -LiteralPath "$destination\docs\ninjaone\index.mdx" | Should -Be '# Other module'
 	}
 
-	It 'syncs only the development guide when requested' {
-		$null = New-Item -Path "$source\development", "$destination\docs\printix\development" -ItemType Directory -Force
+	It 'syncs the development guide and overview without changing released command help' {
+		$null = New-Item -Path "$source\development", "$destination\docs\printix\development", "$destination\docs\printix\commandlets" -ItemType Directory -Force
+		Set-Content -LiteralPath "$source\index.mdx" -Value '# Updated overview'
 		Set-Content -LiteralPath "$source\development\index.mdx" -Value '# Development'
 		Set-Content -LiteralPath "$destination\docs\printix\index.mdx" -Value '# Released overview'
+		Set-Content -LiteralPath "$destination\docs\printix\index.md" -Value '# Legacy overview'
+		Set-Content -LiteralPath "$destination\docs\printix\commandlets\Get-PrintixUsers.mdx" -Value '# Released command'
 		Set-Content -LiteralPath "$destination\docs\printix\development\stale.mdx" -Value '# Stale'
 		& $syncScript -SourcePath $source -DocsRepositoryPath $destination -DevelopmentOnly
 		Get-Content -LiteralPath "$destination\docs\printix\development\index.mdx" | Should -Be '# Development'
-		Get-Content -LiteralPath "$destination\docs\printix\index.mdx" | Should -Be '# Released overview'
+		Get-Content -LiteralPath "$destination\docs\printix\index.mdx" | Should -Be '# Updated overview'
+		Get-Content -LiteralPath "$destination\docs\printix\commandlets\Get-PrintixUsers.mdx" | Should -Be '# Released command'
+		Test-Path -LiteralPath "$destination\docs\printix\index.md" | Should -BeFalse
 		Test-Path -LiteralPath "$destination\docs\printix\development\stale.mdx" | Should -BeFalse
 	}
 

@@ -8,10 +8,12 @@ NinjaOne modules. Requires **PowerShell 7.0 or later**; there are no runtime mod
 
 ## Getting started
 
-From this checkout:
+Install from [PowerShell Gallery](https://www.powershellgallery.com/packages/Printix)
+using PowerShell 7 or later:
 
 ```powershell
-Import-Module .\Source\Printix.psd1
+Install-Module -Name Printix -Repository PSGallery -Scope CurrentUser
+Import-Module Printix
 
 $secret = Read-Host 'Printix client secret' -AsSecureString
 Connect-Printix -ClientId $clientId -ClientSecret $secret -TenantId $tenantId
@@ -24,6 +26,11 @@ Get-PrintixUsers -All
 
 Disconnect-Printix
 ```
+
+Update Gallery installations with `Update-Module -Name Printix`, then start a new
+PowerShell session, import the module and reconnect.
+For development from this checkout, use `Import-Module .\Source\Printix.psd1`
+instead. See the [installation guide](docs/Printix/index.mdx#installing).
 
 Generate client credentials in Printix Administrator. Different application types
 authorize different operations; see the [overview](docs/Printix/index.mdx) and
@@ -126,8 +133,9 @@ builds before publishing, and creates a GitHub release for tags.
 
 Configure `PSGALLERY_API_KEY` in the `PSGallery` environment and `DOCS_REPO_TOKEN`
 in the `Documentation` environment (or at repository/organization level). Successful
-releases sync MDX to `homotechsual/homotechsualdocs`; develop CI syncs only the
-development guide. See [CI/CD and Gallery setup](docs/Printix/development/index.mdx).
+releases sync MDX to `homotechsual/homotechsualdocs`; the separate Sync Development
+Documentation workflow syncs the development guide and overview after develop CI.
+See [CI/CD and Gallery setup](docs/Printix/development/index.mdx).
 
 Source and built-module tests require no Printix credentials and make no live API
 calls. Live permissions, tenant licensing and printer behaviour must be checked

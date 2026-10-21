@@ -10,6 +10,16 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $sourceRoot = (Resolve-Path -LiteralPath $SourcePath).Path
+$overviewSource = Join-Path $sourceRoot 'index.mdx'
+if (-not (Test-Path -LiteralPath $overviewSource -PathType Leaf)) {
+	throw 'Documentation source must contain index.mdx.'
+}
+if ((Get-Item -LiteralPath $sourceRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+	throw 'Documentation source must not contain symbolic links or junctions.'
+}
+if (Get-ChildItem -LiteralPath $sourceRoot -Recurse -Attributes ReparsePoint) {
+	throw 'Documentation source must not contain symbolic links or junctions.'
+}
 $repositoryRoot = (Resolve-Path -LiteralPath $DocsRepositoryPath).Path
 $targetRoot = Join-Path $repositoryRoot 'docs\printix'
 if ($DevelopmentOnly) {
@@ -22,9 +32,6 @@ if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot 'index.mdx') -PathType L
 $files = @(Get-ChildItem -LiteralPath $sourceRoot -Recurse -File)
 if ($files | Where-Object { $_.Extension -ne '.mdx' }) {
 	throw 'The documentation artifact must contain MDX documents only.'
-}
-if (Get-ChildItem -LiteralPath $sourceRoot -Recurse -Attributes ReparsePoint) {
-	throw 'Documentation source must not contain symbolic links or junctions.'
 }
 $ancestors = @($repositoryRoot, (Join-Path $repositoryRoot 'docs'), (Join-Path $repositoryRoot 'docs\printix'), $targetRoot) | Select-Object -Unique
 foreach ($directory in $ancestors) {
@@ -46,5 +53,13 @@ foreach ($file in $files) {
 foreach ($existing in Get-ChildItem -LiteralPath $targetRoot -Recurse -File | Where-Object Extension -In @('.md', '.mdx')) {
 	if ([IO.Path]::GetRelativePath($targetRoot, $existing.FullName) -notin $relativePaths) {
 		Remove-Item -LiteralPath $existing.FullName -ErrorAction Stop
+	}
+	if ($DevelopmentOnly) {
+		$moduleRoot = Split-Path $targetRoot -Parent
+		Copy-Item -LiteralPath $overviewSource -Destination (Join-Path $moduleRoot 'index.mdx') -Force
+		$legacyOverview = Join-Path $moduleRoot 'index.md'
+		if (Test-Path -LiteralPath $legacyOverview) {
+			Remove-Item -LiteralPath $legacyOverview -ErrorAction Stop
+		}
 	}
 }

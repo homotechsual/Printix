@@ -24,12 +24,15 @@ documentation belongs under `docs\Printix` and must use `.mdx`, not `.md`.
 | --- | --- | --- |
 | CI | Pull requests, pushes to main/develop, manual | Static analysis, offline tests, MDX generation, build, packaged tests, module and docs artifacts |
 | Publish | Push a `v*` tag, or manual from main | Validate version and main ancestry, generate docs, test and build, publish to Gallery; tagged runs create a GitHub release with a ZIP |
-| Publish Documentation | Successful Publish, successful develop-push CI, or manual from main | Sync verified MDX artifacts into `homotechsual/homotechsualdocs` on main |
+| Publish Documentation | Successful Publish, or manual from main | Sync the complete verified MDX artifact into `homotechsual/homotechsualdocs` on main |
+| Sync Development Documentation | Successful develop-push CI, or manual from main | Sync the development guide and module overview from develop, preserving released command help |
 
 Release docs sync the complete `docs/printix` document tree. Develop-push CI syncs
-only `docs/printix/development`, leaving released command help and overview intact.
+`docs/printix/development` and `docs/printix/index.mdx`, leaving released command help intact.
 Pull-request runs never push documentation or receive cross-repository credentials.
 Manual docs runs default to dry-run; disable `dry_run` to push.
+Manual development sync reads the develop branch while using publishing tooling
+from main. Both docs workflows share a concurrency group to serialize pushes.
 
 Artifacts used by automated docs publishing are downloaded from the exact successful
 upstream run. The publishing tooling is checked out from main, not from the artifact.
