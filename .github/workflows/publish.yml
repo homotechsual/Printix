@@ -1,26 +1,81 @@
 name: Publish
 
 on:
+  push:
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: printix-release
+  cancel-in-progress: false
+
 jobs:
-  publish:
+  build:
     runs-on: windows-latest
-    environment: PSGallery
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Validate release version and source
+        shell: pwsh
+        run: .\DevOps\Build\Test-Release.ps1 -RefName $env:GITHUB_REF_NAME -Commit $env:GITHUB_SHA
       - name: Bootstrap, build and verify
         shell: pwsh
         run: |
           .\DevOps\Build\bootstrap.ps1
+          .\DevOps\Help\Update-Help.ps1
           .\DevOps\Quality\test.ps1
           .\DevOps\Build\build.ps1
           .\DevOps\Quality\test.ps1 -UseBuiltModule -SkipScriptAnalyzer
+      - uses: actions/upload-artifact@v4
+        with:
+          name: module-build
+          path: Output/Printix/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: module-docs
+          path: docs/Printix/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: windows-latest
+    environment: PSGallery
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: module-build
+          path: Output/Printix/
       - name: Publish to PowerShell Gallery
         shell: pwsh
         env:
           PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
         run: .\DevOps\Build\build.ps1 -TaskNames publish -NuGetApiKey $env:PSGALLERY_API_KEY
+
+  release:
+    needs: publish
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: module-build
+          path: Output/Printix/
+      - name: Create release archive and GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $archive = "Printix-$env:GITHUB_REF_NAME.zip"
+          Compress-Archive -Path '.\Output\Printix' -DestinationPath $archive
+          gh release create "$env:GITHUB_REF_NAME" $archive --verify-tag --title "$env:GITHUB_REF_NAME" --generate-notes

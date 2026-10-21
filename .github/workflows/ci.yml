@@ -20,6 +20,9 @@ jobs:
       - name: Analyze and test source
         shell: pwsh
         run: .\DevOps\Quality\test.ps1
+      - name: Generate MDX documentation
+        shell: pwsh
+        run: .\DevOps\Help\Update-Help.ps1
       - name: Build module
         shell: pwsh
         run: .\DevOps\Build\build.ps1
@@ -31,3 +34,9 @@ jobs:
         with:
           name: Printix
           path: Output/Printix/
+      - name: Upload documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: module-docs
+          path: docs/Printix/
+          if-no-files-found: error

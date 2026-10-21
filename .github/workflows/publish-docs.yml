@@ -1,0 +1,98 @@
+name: Publish Documentation
+
+on:
+  workflow_run:
+    workflows: [CI, Publish]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      development_only:
+        description: Sync only the development guide
+        type: boolean
+        default: false
+      dry_run:
+        description: Prepare documentation without pushing
+        type: boolean
+        default: true
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: printix-docs
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        (
+          (github.event.workflow_run.name == 'Publish' &&
+            (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')) ||
+          (github.event.workflow_run.name == 'CI' && github.event.workflow_run.event == 'push' &&
+            github.event.workflow_run.head_branch == 'develop')
+        )
+      )
+    runs-on: windows-latest
+    environment: Documentation
+    steps:
+      - name: Checkout trusted publishing tooling
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Download verified documentation
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: module-docs
+          path: docs-artifact/
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Generate documentation for a manual run
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\DevOps\Build\bootstrap.ps1
+          .\DevOps\Help\Update-Help.ps1
+          Copy-Item -LiteralPath '.\docs\Printix' -Destination '.\docs-artifact' -Recurse
+      - name: Checkout documentation repository
+        uses: actions/checkout@v6
+        with:
+          repository: homotechsual/homotechsualdocs
+          ref: main
+          path: docs-repo
+          token: ${{ secrets.DOCS_REPO_TOKEN }}
+      - name: Sync Printix documentation
+        shell: pwsh
+        env:
+          DEVELOPMENT_ONLY: ${{ inputs.development_only || github.event.workflow_run.name == 'CI' }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          .\DevOps\Help\Sync-Docs.ps1 -SourcePath '.\docs-artifact' -DocsRepositoryPath '.\docs-repo' -DevelopmentOnly:($env:DEVELOPMENT_ONLY -eq 'true')
+          Push-Location '.\docs-repo'
+          try {
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add -- docs/printix
+            $changes = git diff --cached --name-only
+            if (-not $changes) {
+              Write-Host 'No documentation changes.'
+            } else {
+              git commit -m 'Sync Printix documentation' -m 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>'
+              if ($env:DRY_RUN -eq 'true') {
+                Write-Host 'Dry run: not pushing.'
+              } else {
+                git push origin HEAD:main
+              }
+            }
+          } finally {
+            Pop-Location
+          }

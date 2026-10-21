@@ -120,8 +120,14 @@ See the [endpoint coverage reference](docs/Printix/api-coverage.mdx) for method/
 ```
 
 `DevOps\Build\build.ps1 -TaskNames publish -NuGetApiKey $key` publishes an already
-built module. Publishing is never a default build task. The manual GitHub workflow
-expects a `PSGallery` environment and its `PSGALLERY_API_KEY` secret.
+built module. Publishing is never a default local build task. The GitHub Publish
+workflow runs manually from main or on matching stable `v*` tags, validates and
+builds before publishing, and creates a GitHub release for tags.
+
+Configure `PSGALLERY_API_KEY` in the `PSGallery` environment and `DOCS_REPO_TOKEN`
+in the `Documentation` environment (or at repository/organization level). Successful
+releases sync MDX to `homotechsual/homotechsualdocs`; develop CI syncs only the
+development guide. See [CI/CD and Gallery setup](docs/Printix/development/index.mdx).
 
 Source and built-module tests require no Printix credentials and make no live API
 calls. Live permissions, tenant licensing and printer behaviour must be checked

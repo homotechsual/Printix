@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Complete CI/CD scaffolding with verified MDX artifacts, cross-repository docs sync, stable tag validation and GitHub release archives.
+- Document Gallery first publication, required secrets and environments.
+
 - Add all four documented production Partner API operations with the `PrintixPartner` prefix.
 - Keep independent partner credentials, access tokens and refresh-token renewal alongside the Cloud Print connection.
 
